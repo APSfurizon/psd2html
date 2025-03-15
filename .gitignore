@@ -3,3 +3,6 @@ bin/images/*.png
 bin/*.css
 bin/*.html
 bin/*.js
+*.xcf
+*.psd
+*.html

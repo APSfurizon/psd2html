@@ -41,7 +41,7 @@ def namelayer(checkname: str, i: int):
 		return namelayer(f"{checkname}_{i}", i)
 	else:
 		return checkname
-	
+
 def apporximateStr(i: int):
 	return "%.2f" % i
 def getCorrectDimStr(dim, sizePx, sizeCm):
@@ -53,12 +53,11 @@ elements = []
 def layerstoimage(layers: PSDImage):
 	global zIndex
 	global elements
-	html, css = '', ''
+	html = ''
 	for layer in reversed(layers):
 		if layer.is_group():
 			site = layerstoimage(layer.layers)
-			html += site[0]
-			css += site[1]
+			html += site
 		else:
 			# process name to make unique and strip special characters
 			name = namelayer(layer.name, 0)
@@ -70,93 +69,83 @@ def layerstoimage(layers: PSDImage):
 			name = re.sub('#', '-', name)
 			name = re.sub('©', '', name)
 			print(f"Processing Layer: {name}")
-			
-			print(psd.size, layer.bbox)
-			
 
 			# create css
-			css += f'''
-#{name}{{
-  left: {getCorrectDimStr(layer.bbox[0], widthPx, widthCm)};
-  top: {getCorrectDimStr(layer.bbox[1], heightPx, heightCm)};
-  position: absolute;
-  width: {getCorrectDimStr(layer.bbox[2] - layer.bbox[0], widthPx, widthCm)};
-  height: {getCorrectDimStr(layer.bbox[3] - layer.bbox[1], heightPx, heightCm)};
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-image: url("images/{name}.png");
-  z-index: {zIndex}
-}}
-'''
+			style = ""
+			style += f'left: {getCorrectDimStr(layer.bbox[0], widthPx, widthCm)}; '
+			style += f'top: {getCorrectDimStr(layer.bbox[1], heightPx, heightCm)}; '
+			style += f'position: absolute; '
+			style += f'width: {getCorrectDimStr(layer.bbox[2] - layer.bbox[0], widthPx, widthCm)}; '
+			style += f'height: {getCorrectDimStr(layer.bbox[3] - layer.bbox[1], heightPx, heightCm)}; '
+			style += f'background-repeat: no-repeat; '
+			style += f'background-size: contain; '
+			style += f'background-image: url(\'images/{name}.png\'); '
+			style += f'z-index: {zIndex}; '
+
 			zIndex -= 1
 
 			# create html
-			html += f'  <div id="{name}"></div>\n'
+			html += f'  <div id="{name}" style="{style}"></div>\n'
 
 			# save images as images
 			layer_image = layer.topil()
 			layer_image.save(f"bin/images/{name}.png")
 
-	return html, css
+	return html
 
-html = '''
+cssWidthStr = f"{apporximateStr(widthCm * 10)}mm" if args.mm else f"{psd.width}px"
+cssHeightStr = f"{apporximateStr(heightCm * 10)}mm" if args.mm else f"{psd.height}px"
+
+html = f'''
 <html>
 <head>
-<link rel="stylesheet" href="index.css">
+<style>
+	body {{
+		width: 100%;
+		height: 100%;
+		position: absolute;
+		margin: 0;
+		padding: 0;
+	}}
+	* {{
+		box-sizing: border-box;
+		-moz-box-sizing: border-box;
+	}}
+	.page {{
+		position: relative;
+		width: {cssWidthStr};
+		min-height: {cssHeightStr};
+	}}
+	@page {{
+		size: {cssWidthStr} {cssHeightStr};
+		margin: 0;
+	}}
+	@media print {{
+		html, body {{
+			width: {cssWidthStr};
+			height: {cssHeightStr};
+		}}
+		.page {{
+			margin: 0;
+			border: initial;
+			border-radius: initial;
+			width: initial;
+			min-height: initial;
+			box-shadow: initial;
+			background: initial;
+			page-break-after: always;
+		}}
+	}}
+</style>
 </head>
 <body>
   <div class="page">
-'''
-cssWidthStr = f"{apporximateStr(widthCm * 10)}mm" if args.mm else f"{psd.width}px"
-cssHeightStr = f"{apporximateStr(heightCm * 10)}mm" if args.mm else f"{psd.height}px"
-css = f'''
-body {{
-	width: 100%;
-	height: 100%;
-	position: absolute;
-	margin: 0;
-	padding: 0;
-}}
-* {{
-	box-sizing: border-box;
-	-moz-box-sizing: border-box;
-}}
-.page {{
-	position: relative;
-	width: {cssWidthStr};
-	min-height: {cssHeightStr};
-}}
-@page {{
-	size: {cssWidthStr} {cssHeightStr};
-	margin: 0;
-}}
-@media print {{
-	html, body {{
-		width: {cssWidthStr};
-		height: {cssHeightStr};        
-	}}
-	.page {{
-		margin: 0;
-		border: initial;
-		border-radius: initial;
-		width: initial;
-		min-height: initial;
-		box-shadow: initial;
-		background: initial;
-		page-break-after: always;
-	}}
-}}
+{layerstoimage(psd)}
+  </div>
+</body>
+</html>
 '''
 
-site = layerstoimage(psd)
-html += site[0]
-html += '  </div>\n</body>\n</html>'
-css += site[1]
-
-f = codecs.open('bin/index.html','w', "utf-8")
+f = codecs.open('index.html','w', "utf-8")
 f.write(html)
-f.close()
-
-f = codecs.open('bin/index.css','w', "utf-8")
-f.write(css)
 f.close()
